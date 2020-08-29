@@ -51,6 +51,7 @@ http:zijiang.com"""
 # 0416:5011 is POS58 USB thermal receipt printer
 
 def connect_device():
+    lcd.clear()
     lcd.write_string('Connecting...')
     try:
     #dev = usb.core.find(idVendor=0x0416, idProduct=0x5011)
