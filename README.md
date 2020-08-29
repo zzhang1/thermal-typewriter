@@ -17,3 +17,13 @@ In this example, the ID from `lsusb` was 4b43:3538. Add the following to the fil
 
     # Set permissions to let anyone use the thermal receipt printer
     SUBSYSTEM=="usb", ATTR{idVendor}=="4b43", ATTR{idProduct}=="3538", MODE="666"
+
+Edit the source code to search for the same USB device ID
+
+## Use
+* Ctrl-F: Toggle font size (Font A (normal) and Font B (small))
+* Ctrl-B: Bold
+* Ctrl-U: Underline
+* Ctrl-L: Left Align
+* Ctrl-E: Center Align
+* Ctrl-R: Right Align
