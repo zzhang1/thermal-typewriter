@@ -1,9 +1,8 @@
 import usb.core
 import usb.util
-import time 
-#Include libraries
-import RPi.GPIO as GPIO
 import time
+
+import RPi.GPIO as GPIO
 from RPLCD.gpio import CharLCD
 
 lcd = CharLCD(pin_rs = 7, pin_rw = None, pin_e = 8, pins_data = [25,24,23,18], 
@@ -53,48 +52,38 @@ http:zijiang.com"""
 def connect_device():
     lcd.clear()
     lcd.write_string('Connecting...')
-    try:
-    #dev = usb.core.find(idVendor=0x0416, idProduct=0x5011)
-        global dev
-        dev = usb.core.find(idVendor=0x4B43, idProduct=0x3538)
+    global dev, needs_reattach, ep
+    while True:
+        try:
+            dev = usb.core.find(idVendor=0x4B43, idProduct=0x3538)
+            if dev is None:
+                raise ValueError('Printer not found')
 
-        # Was it found?
-        if dev is None:
-            raise ValueError('Device not found')
-        else:
             print('Printer found and attached')
+            needs_reattach = False
+            if dev.is_kernel_driver_active(0):
+                needs_reattach = True
+                dev.detach_kernel_driver(0)
 
-        # Disconnect it from kernel
-        global needs_reattach
-        needs_reattach = False
-        if dev.is_kernel_driver_active(0):
-            needs_reattach = True
-            dev.detach_kernel_driver(0)
+            dev.set_configuration()
+            interface = dev.get_active_configuration()[(0, 0)]
+            ep = usb.util.find_descriptor(
+                interface,
+                custom_match=lambda endpoint: (
+                    usb.util.endpoint_direction(endpoint.bEndpointAddress)
+                    == usb.util.ENDPOINT_OUT
+                ),
+            )
+            if ep is None:
+                raise ValueError('Printer has no output endpoint')
 
-        # Set the active configuration. With no arguments, the first
-        # configuration will be the active one
-        dev.set_configuration()
-
-        # get an endpoint instance
-        cfg = dev.get_active_configuration()
-        intf = cfg[(0,0)]
-
-        global ep
-        ep = usb.util.find_descriptor(
-            intf,
-            # match the first OUT endpoint
-            custom_match = \
-            lambda e: \
-                usb.util.endpoint_direction(e.bEndpointAddress) == \
-                usb.util.ENDPOINT_OUT)
-
-        assert ep is not None
-        lcd.clear()
-        lcd.write_string('Happy Typing!')
-        time.sleep(2)
-    except:
-        time.sleep(5)
-        connect_device()
+            lcd.clear()
+            lcd.write_string('Happy Typing!')
+            time.sleep(2)
+            return
+        except Exception as error:
+            print('Could not connect to printer: {}'.format(error))
+            time.sleep(5)
 
 
 ## Get keyboard character input
@@ -166,7 +155,7 @@ def handle_whole_word_break(c, char_buffer):
         try:
             last_space = ''.join(char_buffer).rindex(' ')
             new_buffer = char_buffer[last_space+1:]
-        except:
+        except ValueError:
             new_buffer = []
             last_space = len(char_buffer)-1
         print_buffer(''.join(char_buffer[:last_space+1]))
@@ -271,17 +260,19 @@ def loop():
 # Print the string to printer and clear the screen
 def print_buffer(string_buffer):
     global injection_buffer
-    try:
-        # Inject any ESC commands
-        while len(injection_buffer) > 0:
-            location, inject_string = injection_buffer.pop()
-            string_buffer = string_buffer[:location] + inject_string + string_buffer[location:]
-        ep.write(string_buffer + '\n')
-        print(string_buffer)
-    except:
-        print('Reconnecting to printer')
-        connect_device()
-        print_buffer(string_buffer)
+    # Inject ESC/POS commands from right to left so earlier positions stay valid.
+    for location, inject_string in reversed(injection_buffer):
+        string_buffer = string_buffer[:location] + inject_string + string_buffer[location:]
+    injection_buffer.clear()
+
+    while True:
+        try:
+            ep.write((string_buffer + '\n').encode('ascii'))
+            print(string_buffer)
+            break
+        except Exception as error:
+            print('Printer write failed: {}'.format(error))
+            connect_device()
     lcd.clear()
 
 

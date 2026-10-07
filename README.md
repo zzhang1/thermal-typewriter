@@ -1,35 +1,59 @@
-# thermal-typewriter
-Typewriter app for connecting to thermal printer from Raspberry Pi, printing text line by line. Supports using a 16x2 LCD display as a display.
+# Thermal Typewriter
 
-## Setup
-### Hardware Requirements
-1. Raspberry Pi
-2. Thermal Printer with USB mode supported
-3. Optional but suggested: 16x2 LCD display
-### Software Requirements
-    sudo pip3 install pyusb
+A small Raspberry Pi app that sends typed text to a USB thermal printer. An optional 16×2 LCD shows the current line and status messages.
 
-Find the ID of the USB device with lsusb. The ID is 8 digits in the form of VEND:PROD
+## Requirements
 
-    lsusb
+- Raspberry Pi with Python 3
+- USB thermal printer
+- Optional 16×2 LCD wired to the BCM GPIO pins listed in `typewriter.py`
+- Python packages: `pyusb`, `RPLCD`, and `RPi.GPIO`
 
-Add permission to all users to use the USB printer. Make a new udev rule file with.
+Create a virtual environment and install the Python packages:
 
-    sudo nano /etc/udev/rules.d/33-receipt-printer.rules
+```sh
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+python -m pip install pyusb RPLCD RPi.GPIO
+```
 
-In this example, the ID from `lsusb` was 4b43:3538. Add the following to the file and save. 
+## Printer setup
 
-    # Set permissions to let anyone use the thermal receipt printer
-    SUBSYSTEM=="usb", ATTR{idVendor}=="4b43", ATTR{idProduct}=="3538", MODE="666"
+Find the printer's vendor and product IDs:
 
-Edit the source code to search for the same USB device ID
+```sh
+lsusb
+```
 
-Optionally, connect LCD to the pins as specified in the source code, to use as a display.
+Create a udev rule for that device (replace the example IDs with the values from `lsusb`):
 
-## Use
-* Ctrl-F: Toggle font size (Font A (normal) and Font B (small))
-* Ctrl-B: Bold
-* Ctrl-U: Underline
-* Ctrl-L: Left Align
-* Ctrl-E: Center Align
-* Ctrl-R: Right Align
+```sh
+sudo nano /etc/udev/rules.d/33-receipt-printer.rules
+```
+
+Add:
+
+```text
+SUBSYSTEM=="usb", ATTR{idVendor}=="4b43", ATTR{idProduct}=="3538", GROUP="lp", MODE="0660"
+```
+
+Reload udev rules or reconnect the printer. The same IDs are currently set in `typewriter.py`.
+
+## Run
+
+```sh
+python3 typewriter.py
+```
+
+Type in the terminal; press Enter to print the current line. Press Ctrl-C to exit.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| Ctrl-F | Toggle regular and small font |
+| Ctrl-B | Toggle bold |
+| Ctrl-U | Toggle underline |
+| Ctrl-L | Left align |
+| Ctrl-E | Center align |
+| Ctrl-R | Right align |
